@@ -28,16 +28,36 @@ if (( ${#src[@]} != ${#dest[@]} )); then
     exit 1
 fi
 
-declare -i count=0
+declare -i desired_renames=0
 for ((i=0;i<${#src[@]};++i)); do
     if [ "${src[i]}" != "${dest[i]}" ]; then
-        mkdir -p "$(dirname "${dest[i]}")"
-        if git ls-files --error-unmatch "${src[i]}" > /dev/null 2>&1; then
-            git mv "${src[i]}" "${dest[i]}"
-        else
-            mv "${src[i]}" "${dest[i]}"
+        ((++desired_renames))
+    fi
+done
+
+declare -i fruitless_attempts=0
+declare -i old_count=0
+declare -i count=0
+while [ "$fruitless_attempts" -lt 2 ] && [ "$count" != "$desired_renames" ]; do
+    for ((i=0;i<${#src[@]};++i)); do
+        if [ "${src[i]}" != "${dest[i]}" ]; then
+            if [ ! -e "${dest[i]}" ]; then
+                mkdir -p "$(dirname "${dest[i]}")"
+                if git ls-files --error-unmatch "${src[i]}" > /dev/null 2>&1; then
+                    git mv "${src[i]}" "${dest[i]}"
+                else
+                    mv -n "${src[i]}" "${dest[i]}"
+                fi
+                ((++count))
+            else
+                continue
+            fi
         fi
-        ((++count))
+    done
+    if [ "$count" != "$old_count" ]; then
+        ((old_count=count))
+    else
+        ((++fruitless_attempts))
     fi
 done
 
